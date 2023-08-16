@@ -215,13 +215,14 @@ async function handleICE(session_id, candidate) {
 
 // repeat the text
 async function sendTask(session_id, text) {
+  const task_type = "repeat";
   const response = await fetch(`${SERVER_URL}/v1/realtime.task`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "X-Api-Key": apiKey,
     },
-    body: JSON.stringify({ session_id, text }),
+    body: JSON.stringify({ session_id, text, task_type }),
   });
   if (response.status === 500) {
     console.error("Server error");
