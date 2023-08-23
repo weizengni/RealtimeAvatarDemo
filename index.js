@@ -3,10 +3,10 @@
 import heygen_API from "./api.json" assert { type: "json" };
 
 const statusElement = document.querySelector("#status");
-const apiKey = heygen_API.apiKey;
 const SERVER_URL = heygen_API.serverUrl;
+const SESSION_TOKEN = heygen_API.sessionToken;
 
-if (apiKey === "YourApiKey" || SERVER_URL === "") {
+if (SERVER_URL === "") {
   alert("Please enter your API key and server URL in the api.json file");
 }
 
@@ -28,7 +28,7 @@ async function createNewSession() {
   updateStatus(statusElement, "Creating new session... please wait");
 
   // call the new interface to get the server's offer SDP and ICE server to create a new RTCPeerConnection
-  sessionInfo = await newSession("high");
+  sessionInfo = await newSession("high", "avatar_2", "zh-CN-XiaoxiaoNeural");
   const { sdp: serverSdp, ice_servers: iceServers } = sessionInfo;
 
   // Create a new RTCPeerConnection
@@ -93,7 +93,7 @@ async function startAndDisplaySession() {
 const taskInput = document.querySelector("#taskInput");
 
 // When clicking the "Send Task" button, get the content from the input field, then send the tas
-async function sendTaskHandler() {
+async function talkHandler() {
   if (!sessionInfo) {
     updateStatus(statusElement, "Please create a connection first");
 
@@ -106,7 +106,26 @@ async function sendTaskHandler() {
     return;
   }
 
-  const resp = await sendTask(sessionInfo.session_id, text);
+  const resp = await talk(sessionInfo.session_id, text);
+
+  updateStatus(statusElement, "Task sent successfully");
+}
+
+// When clicking the "Send Task" button, get the content from the input field, then send the tas
+async function repeatHandler() {
+  if (!sessionInfo) {
+    updateStatus(statusElement, "Please create a connection first");
+
+    return;
+  }
+  updateStatus(statusElement, "Sending task... please wait");
+  const text = taskInput.value;
+  if (text.trim() === "") {
+    alert("Please enter a task");
+    return;
+  }
+
+  const resp = await repeat(sessionInfo.session_id, text);
 
   updateStatus(statusElement, "Task sent successfully");
 }
@@ -136,21 +155,24 @@ document
   .querySelector("#startBtn")
   .addEventListener("click", startAndDisplaySession);
 document
-  .querySelector("#sendTaskBtn")
-  .addEventListener("click", sendTaskHandler);
+  .querySelector("#talkBtn")
+  .addEventListener("click", talkHandler);
+document
+  .querySelector("#repeatBtn")
+  .addEventListener("click", repeatHandler);
 document
   .querySelector("#closeBtn")
   .addEventListener("click", closeConnectionHandler);
 
 // new session
-async function newSession(quality) {
+async function newSession(quality, avatar_name, voice_name) {
   const response = await fetch(`${SERVER_URL}/v1/realtime.new`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Api-Key": apiKey,
+      "X-Session-Token": SESSION_TOKEN,
     },
-    body: JSON.stringify({ quality }),
+    body: JSON.stringify({ quality, avatar_name, voice_name }),
   });
   if (response.status === 500) {
     console.error("Server error");
@@ -173,7 +195,7 @@ async function startSession(session_id, sdp) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Api-Key": apiKey,
+      "X-Session-Token": SESSION_TOKEN,
     },
     body: JSON.stringify({ session_id, sdp }),
   });
@@ -196,7 +218,7 @@ async function handleICE(session_id, candidate) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Api-Key": apiKey,
+      "X-Session-Token": SESSION_TOKEN,
     },
     body: JSON.stringify({ session_id, candidate }),
   });
@@ -213,14 +235,37 @@ async function handleICE(session_id, candidate) {
   }
 }
 
+async function talk(session_id, text) {
+  const task_type = "talk";
+  const response = await fetch(`${SERVER_URL}/v1/realtime.task`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Session-Token": SESSION_TOKEN,
+    },
+    body: JSON.stringify({ session_id, text, task_type }),
+  });
+  if (response.status === 500) {
+    console.error("Server error");
+    updateStatus(
+      statusElement,
+      "Server Error. Please ask the staff if the service has been turned on"
+    );
+    throw new Error("Server error");
+  } else {
+    const data = await response.json();
+    return data.data;
+  }
+}
+
 // repeat the text
-async function sendTask(session_id, text) {
+async function repeat(session_id, text) {
   const task_type = "repeat";
   const response = await fetch(`${SERVER_URL}/v1/realtime.task`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Api-Key": apiKey,
+      "X-Session-Token": SESSION_TOKEN,
     },
     body: JSON.stringify({ session_id, text, task_type }),
   });
@@ -243,7 +288,7 @@ async function stopSession(session_id) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Api-Key": apiKey,
+      "X-Session-Token": SESSION_TOKEN,
     },
     body: JSON.stringify({ session_id }),
   });
